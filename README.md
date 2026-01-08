@@ -1,179 +1,248 @@
-# 🌌 Aurora - Spatial SaaS Dashboard
+<div align="center">
 
-Aurora is a revolutionary data visualization platform that replaces traditional 2D scrolling/tabs with an immersive Z-axis navigation experience. Built with React Three Fiber for WebGL rendering and Express.js backend.
+# 🌌 Aurora
 
-## ✨ Features
+### Spatial Dashboard Engine
 
-- **Z-Axis Navigation**: Navigate through data layers using scroll, keyboard, or touch
-- **Glassmorphism UI**: Premium translucent design with depth blur
-- **Widget System**: Metric, Chart, and Composite widget types
-- **Real-time Updates**: Live data visualization
-- **JWT Authentication**: Secure user sessions
+*Navigate your data in three dimensions*
 
-## 🚀 Tech Stack
+[![Live Demo](https://img.shields.io/badge/Live-Demo-blueviolet?style=for-the-badge)](https://aurora-dashboard-five.vercel.app)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Three.js](https://img.shields.io/badge/Three.js-000000?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
 
-**Frontend:**
+<br />
 
-- React 18 + TypeScript
-- React Three Fiber (WebGL)
-- Zustand (State Management)
-- Tailwind CSS
-- Vite
+<img src="assets/hero.png" alt="Aurora - Spatial Dashboard" width="800" />
 
-**Backend:**
+<br />
 
-- Express.js + TypeScript
-- PostgreSQL
-- JWT Authentication
-- Winston Logging
+**[🚀 Try Live Demo](https://aurora-dashboard-five.vercel.app)** • **[📖 Documentation](#features)** • **[🛠️ Setup](#quick-start)**
 
-## 🛠️ Local Development
+</div>
+
+---
+
+## ✨ What is Aurora?
+
+Aurora reimagines data dashboards by replacing traditional 2D scrolling with **immersive Z-axis navigation**. Dive through layers of your data like floating through space, with beautiful glassmorphism effects and smooth parallax animations.
+
+<details>
+<summary><b>🎬 See it in action</b></summary>
+<br />
+
+- Navigate between **5 depth layers** using keyboard or buttons
+- Watch widgets float with **parallax animation**
+- Experience **glassmorphism** with depth-based blur
+- Explore with subtle **camera orbit controls**
+
+</details>
+
+---
+
+## 🎯 Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🌐 Z-Engine
+
+WebGL-powered 3D engine built on React Three Fiber
+
+- Smooth camera transitions along Z-axis
+- Dynamic FOV based on zoom level
+- Multi-point stage lighting
+- Ambient particles & stars
+
+</td>
+<td width="50%">
+
+### 🎨 Glassmorphism
+
+Custom GLSL shaders for depth perception
+
+- Animated shimmer effects
+- Distance-based blur (Prism effect)
+- Active layer highlighting
+- Soft edge glow
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 📊 Widget System
+
+Three widget types with auto-generated data
+
+- **Metric** - KPI with trend indicator
+- **Chart** - Sparkline visualization
+- **Composite** - Breakdown bars
+
+</td>
+<td width="50%">
+
+### 🔧 Docking System
+
+Widgets snap to layer positions
+
+- X/Y coordinate placement
+- Layer assignment
+- Smart grid fallback
+- State management with Zustand
+
+</td>
+</tr>
+</table>
+
+---
+
+## ⚡ Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL database
+- PostgreSQL (or Neon)
 - npm 9+
 
-### Setup
+### Installation
 
-1. **Clone and install:**
+```bash
+# Clone the repository
+git clone https://github.com/salvadalba/nodaysidle-projectAurora.git
+cd nodaysidle-projectAurora
 
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/aurora.git
-   cd aurora
-   npm install
-   ```
+# Install dependencies
+npm install
 
-2. **Configure environment:**
+# Configure environment
+cp backend/.env.example backend/.env
+# Edit backend/.env with your database credentials
 
-   ```bash
-   cp backend/.env.example backend/.env
-   # Edit backend/.env with your database credentials
-   ```
+# Run migrations
+npm run db:migrate --workspace=backend
+npm run db:seed --workspace=backend
 
-   Required environment variables:
+# Start development servers
+npm run dev:backend   # Terminal 1: Backend on :3000
+npm run dev:frontend  # Terminal 2: Frontend on :5173
+```
 
-   ```
-   DATABASE_URL=postgresql://user:password@localhost:5432/aurora
-   JWT_SECRET=your-secret-key-here
-   JWT_EXPIRATION=24h
-   PORT=3000
-   ```
+### Environment Variables
 
-3. **Run migrations and seed:**
+```env
+# Backend
+DATABASE_URL=postgresql://user:pass@host:5432/aurora
+JWT_SECRET=your-secret-key
+FRONTEND_URL=http://localhost:5173
 
-   ```bash
-   npm run db:migrate --workspace=backend
-   npm run db:seed --workspace=backend
-   ```
+# Frontend
+VITE_API_URL=http://localhost:3000/api
+```
 
-4. **Start development servers:**
+---
 
-   ```bash
-   # Terminal 1: Backend
-   npm run dev:backend
-   
-   # Terminal 2: Frontend
-   npm run dev:frontend
-   ```
+## 🎮 Controls
 
-5. **Open browser:** <http://localhost:5173>
+| Control | Action |
+|---------|--------|
+| `↑` / `↓` | Navigate between layers |
+| `W` / `S` | Navigate between layers |
+| `+` / `-` | Zoom in/out |
+| `Scroll` | Navigate depth |
+| `Home` | Jump to surface |
+| `End` | Jump to deepest layer |
+| `Mouse Drag` | Slight camera orbit |
 
-### Demo Credentials
+---
 
-- Email: `demo@aurora.dev`
-- Password: `demo123`
-
-## 📦 Deployment
-
-### Option 1: Vercel + Neon PostgreSQL
-
-1. **Create Neon database:**
-   - Go to [neon.tech](https://neon.tech)
-   - Create a new project
-   - Copy the connection string
-
-2. **Deploy Backend to Vercel:**
-
-   ```bash
-   cd backend
-   vercel
-   ```
-
-   Set environment variables:
-   - `DATABASE_URL`: Your Neon connection string
-   - `JWT_SECRET`: A secure random string
-   - `FRONTEND_URL`: Your frontend URL
-
-3. **Deploy Frontend to Vercel:**
-
-   ```bash
-   cd ..
-   vercel
-   ```
-
-   Set environment variables:
-   - `VITE_API_URL`: Your backend URL + `/api`
-
-### Option 2: Railway
-
-1. Create new project on [railway.app](https://railway.app)
-2. Add PostgreSQL service
-3. Deploy from GitHub
-4. Configure environment variables
-
-## 🗂️ Project Structure
+## 🏗️ Architecture
 
 ```
 aurora/
-├── frontend/                 # React + Vite frontend
+├── frontend/                 # React + Vite + TypeScript
 │   ├── src/
-│   │   ├── api/             # API client
-│   │   ├── components/      # Widget components
-│   │   ├── engine/          # Z-Engine (R3F)
-│   │   ├── hooks/           # Custom hooks
-│   │   ├── routes/          # Page components
-│   │   └── store/           # Zustand stores
+│   │   ├── engine/          # Z-Engine (React Three Fiber)
+│   │   │   ├── ZEngine.tsx  # Main canvas & scene graph
+│   │   │   └── LayerStack.tsx # GLSL glassmorphism layers
+│   │   ├── components/      # Widget renderers
+│   │   ├── store/           # Zustand state (zStore, dockingStore)
+│   │   └── hooks/           # useZNavigation
 │   └── package.json
-├── backend/                  # Express.js backend
+├── backend/                  # Express.js + TypeScript
 │   ├── src/
-│   │   ├── controllers/     # Route handlers
-│   │   ├── db/              # Database connection
-│   │   ├── middleware/      # Express middleware
-│   │   ├── routes/          # API routes
-│   │   ├── services/        # Business logic
-│   │   └── utils/           # Helpers
-│   ├── migrations/          # SQL migrations
-│   └── package.json
-└── package.json             # Root monorepo config
+│   │   ├── routes/          # REST API endpoints
+│   │   ├── db/              # PostgreSQL connection
+│   │   └── middleware/      # Auth, logging
+│   └── migrations/          # SQL schemas
+└── package.json             # Monorepo root
 ```
 
-## 🔌 API Endpoints
+---
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | /api/auth/login | User login |
-| POST | /api/auth/logout | User logout |
-| GET | /api/dashboards | List dashboards |
-| POST | /api/dashboards | Create dashboard |
-| GET | /api/dashboards/:id | Get dashboard |
-| POST | /api/dashboards/:id/layers | Create layer |
-| POST | /api/widgets | Create widget |
-| GET | /api/widgets/:id | Get widget |
-| PATCH | /api/widgets/:id | Update widget |
-| DELETE | /api/widgets/:id | Delete widget |
-| GET | /api/widgets/:id/data | Get widget data |
-| GET | /api/users/me | Get user profile |
-| PATCH | /api/users/me/preferences | Update preferences |
+## 🚀 Deployment
 
-## 🎮 Navigation Controls
+### Vercel + Neon (Recommended)
 
-- **↑/↓ or W/S**: Navigate depth layers
-- **Mouse Wheel**: Scroll through layers
-- **Home/End**: Jump to surface/deepest layer
-- **+/-**: Zoom in/out
+1. **Database**: Create a [Neon](https://neon.tech) PostgreSQL database
+2. **Backend**: Deploy `/backend` to Vercel
+3. **Frontend**: Deploy root with `vercel.json`
+4. **Environment**: Set variables in Vercel dashboard
 
-## 📄 License
+### Live Deployment
+
+| Service | URL |
+|---------|-----|
+| Frontend | [aurora-dashboard-five.vercel.app](https://aurora-dashboard-five.vercel.app) |
+| Backend | aurora-api-phi.vercel.app |
+| Database | Neon (Frankfurt) |
+
+---
+
+## 🛠️ Tech Stack
+
+<div align="center">
+
+| Frontend | Backend | Infrastructure |
+|----------|---------|---------------|
+| React 18 | Express.js | Vercel |
+| TypeScript | TypeScript | Neon PostgreSQL |
+| React Three Fiber | PostgreSQL | GitHub Actions |
+| Three.js | JWT Auth | npm Workspaces |
+| Zustand | Winston Logging | |
+| Tailwind CSS | Helmet Security | |
+| Vite | | |
+
+</div>
+
+---
+
+## 📄 API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/auth/login` | User authentication |
+| `GET` | `/api/dashboards` | List dashboards |
+| `GET` | `/api/dashboards/:id` | Get dashboard with layers |
+| `POST` | `/api/dashboards/:id/layers` | Create layer |
+| `POST` | `/api/widgets` | Create widget |
+| `PATCH` | `/api/widgets/:id` | Update widget |
+| `DELETE` | `/api/widgets/:id` | Delete widget |
+| `GET` | `/api/users/me` | Get profile |
+
+---
+
+## 📜 License
 
 MIT License - See [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+**Built with ❤️ using React Three Fiber**
+
+[⬆ Back to top](#-aurora)
+
+</div>
