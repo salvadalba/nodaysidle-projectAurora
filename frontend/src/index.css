@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Aurora Base Styles */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-shadow: rgba(0, 0, 0, 0.4);
+  --aurora-primary: #6366f1;
+  --aurora-secondary: #8b5cf6;
+  --aurora-accent: #06b6d4;
+  --aurora-surface: #0f0f23;
+  --aurora-surface-elevated: #1a1a2e;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, var(--aurora-surface) 0%, var(--aurora-surface-elevated) 100%);
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glassmorphism Utilities */
+@layer components {
+  .glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px var(--glass-shadow);
+  }
+
+  .glass-panel-subtle {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+  }
+
+  .glass-button {
+    @apply px-6 py-3 rounded-xl font-medium transition-all duration-300;
+    background: linear-gradient(135deg, var(--aurora-primary), var(--aurora-secondary));
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+  }
+
+  .glass-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+  }
+
+  .glass-input {
+    @apply w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10;
+    @apply text-white placeholder-white/40 transition-all duration-300;
+    @apply focus:outline-none focus:border-aurora-primary focus:ring-2 focus:ring-aurora-primary/20;
+  }
+
+  .aurora-gradient-text {
+    background: linear-gradient(90deg, var(--aurora-primary), var(--aurora-accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
