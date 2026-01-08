@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ZEngine } from '../engine/ZEngine';
 import { useZStore } from '../store/zStore';
 import { useZNavigation } from '../hooks/useZNavigation';
-import { useAuthStore } from '../store/authStore';
-import { dashboardApi, Dashboard } from '../api/client';
 
 // Depth indicator component
 function DepthIndicator() {
@@ -75,81 +72,38 @@ function NavigationHint() {
     );
 }
 
+// Demo mock data - no API required
+const DEMO_LAYERS = [
+    { id: 'layer-0', zIndex: 0, name: 'Surface', opacity: 1.0, blurIntensity: 0 },
+    { id: 'layer-1', zIndex: 1, name: 'Metrics', opacity: 0.95, blurIntensity: 5 },
+    { id: 'layer-2', zIndex: 2, name: 'Charts', opacity: 0.9, blurIntensity: 10 },
+    { id: 'layer-3', zIndex: 3, name: 'Analytics', opacity: 0.85, blurIntensity: 15 },
+];
+
+const DEMO_WIDGETS = [
+    { id: 'w1', layer_id: 'layer-1', type: 'metric' as const, title: 'Revenue', config: {}, data_source: {}, is_docked: true, docked_layer_id: 'layer-1', docked_position: { x: -3, y: 1 }, z_index: 0, dashboard_id: 'demo' },
+    { id: 'w2', layer_id: 'layer-1', type: 'metric' as const, title: 'Users', config: {}, data_source: {}, is_docked: true, docked_layer_id: 'layer-1', docked_position: { x: 0, y: 1 }, z_index: 0, dashboard_id: 'demo' },
+    { id: 'w3', layer_id: 'layer-2', type: 'chart' as const, title: 'Sales Trend', config: {}, data_source: {}, is_docked: true, docked_layer_id: 'layer-2', docked_position: { x: 0, y: 0 }, z_index: 0, dashboard_id: 'demo' },
+    { id: 'w4', layer_id: 'layer-3', type: 'composite' as const, title: 'Performance', config: {}, data_source: {}, is_docked: true, docked_layer_id: 'layer-3', docked_position: { x: 0, y: 0 }, z_index: 0, dashboard_id: 'demo' },
+];
+
 export default function DashboardPage() {
-    const navigate = useNavigate();
-    const { user, isAuthenticated, isLoading: authLoading, logout } = useAuthStore();
     const { setLayers } = useZStore();
     const { goDeeper, goShallower } = useZNavigation();
-
-    const [dashboard, setDashboard] = useState<Dashboard | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
 
-    // Check auth on mount
+    // Initialize with demo data
     useEffect(() => {
-        if (!authLoading && !isAuthenticated) {
-            navigate('/login');
-        }
-    }, [isAuthenticated, authLoading, navigate]);
+        setLayers(DEMO_LAYERS);
+        // Simulate brief loading
+        const timer = setTimeout(() => setLoading(false), 500);
+        return () => clearTimeout(timer);
+    }, [setLayers]);
 
-    // Load dashboard data
-    useEffect(() => {
-        async function loadDashboard() {
-            try {
-                setLoading(true);
-                // Try to get user's default dashboard or list and pick first
-                const { dashboards } = await dashboardApi.list();
-
-                if (dashboards.length > 0) {
-                    const fullDashboard = await dashboardApi.get(dashboards[0].id, true);
-                    setDashboard(fullDashboard);
-
-                    // Set layers in Z store
-                    const storeLayers = fullDashboard.layers.map(l => ({
-                        id: l.id,
-                        zIndex: l.z_index,
-                        name: l.name,
-                        opacity: parseFloat(String(l.opacity)),
-                        blurIntensity: l.blur_intensity,
-                    }));
-                    setLayers(storeLayers);
-                }
-            } catch (err) {
-                console.error('Failed to load dashboard:', err);
-                setError('Failed to load dashboard');
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        if (isAuthenticated) {
-            loadDashboard();
-        }
-    }, [isAuthenticated, setLayers]);
-
-    const handleLogout = async () => {
-        await logout();
-        navigate('/login');
-    };
-
-    if (authLoading || loading) {
+    if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-aurora-surface">
                 <div className="text-white text-lg animate-pulse">Loading Aurora...</div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-aurora-surface gap-4">
-                <div className="text-red-400">{error}</div>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="px-4 py-2 bg-aurora-primary/20 hover:bg-aurora-primary/40 rounded-lg text-white transition-colors"
-                >
-                    Retry
-                </button>
             </div>
         );
     }
@@ -162,23 +116,15 @@ export default function DashboardPage() {
                     <h1 className="text-xl font-bold text-white">
                         🌌 Aurora
                     </h1>
-                    {dashboard && (
-                        <span className="text-white/60">
-                            / {dashboard.name}
-                        </span>
-                    )}
+                    <span className="text-white/60">
+                        / Spatial Dashboard Demo
+                    </span>
                 </div>
 
                 <div className="flex items-center gap-4">
                     <span className="text-white/60 text-sm">
-                        {user?.email}
+                        Z-Axis Navigation Demo
                     </span>
-                    <button
-                        onClick={handleLogout}
-                        className="px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                    >
-                        Sign Out
-                    </button>
                 </div>
             </header>
 
@@ -186,7 +132,7 @@ export default function DashboardPage() {
             <main className="pt-16 h-screen">
                 <ZEngine
                     className="w-full h-full"
-                    widgets={dashboard?.layers.flatMap(l => l.widgets) || []}
+                    widgets={DEMO_WIDGETS}
                 />
             </main>
 
