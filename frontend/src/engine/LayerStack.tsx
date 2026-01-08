@@ -1,67 +1,66 @@
 import { useRef, useMemo } from 'react';
 import { useFrame, extend } from '@react-three/fiber';
-import { shaderMaterial } from '@react-three/drei';
+import { shaderMaterial, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useZStore, Layer } from '../store/zStore';
 
-// Custom depth blur shader material
+// Custom depth blur shader material for glassmorphism
 const DepthBlurMaterial = shaderMaterial(
     {
-        uTexture: null,
         uBlurAmount: 0,
         uOpacity: 1,
         uTime: 0,
+        uColor: new THREE.Color('#1e1e3f'),
+        uGlowColor: new THREE.Color('#6366f1'),
+        uActiveGlow: 0,
     },
     // Vertex shader
     `
     varying vec2 vUv;
+    varying vec3 vNormal;
     void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vUv = uv;
+        vNormal = normal;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }
-  `,
-    // Fragment shader with blur effect
+    `,
+    // Fragment shader with glassmorphism
     `
-    uniform sampler2D uTexture;
     uniform float uBlurAmount;
     uniform float uOpacity;
     uniform float uTime;
+    uniform vec3 uColor;
+    uniform vec3 uGlowColor;
+    uniform float uActiveGlow;
     varying vec2 vUv;
+    varying vec3 vNormal;
     
     void main() {
-      vec4 color = vec4(0.0);
-      
-      // Simple box blur for glassmorphism effect
-      float blur = uBlurAmount * 0.01;
-      
-      if (blur > 0.0) {
-        // 9-tap blur
-        color += texture2D(uTexture, vUv + vec2(-blur, -blur)) * 0.0625;
-        color += texture2D(uTexture, vUv + vec2(0.0, -blur)) * 0.125;
-        color += texture2D(uTexture, vUv + vec2(blur, -blur)) * 0.0625;
-        color += texture2D(uTexture, vUv + vec2(-blur, 0.0)) * 0.125;
-        color += texture2D(uTexture, vUv) * 0.25;
-        color += texture2D(uTexture, vUv + vec2(blur, 0.0)) * 0.125;
-        color += texture2D(uTexture, vUv + vec2(-blur, blur)) * 0.0625;
-        color += texture2D(uTexture, vUv + vec2(0.0, blur)) * 0.125;
-        color += texture2D(uTexture, vUv + vec2(blur, blur)) * 0.0625;
-      } else {
-        color = texture2D(uTexture, vUv);
-      }
-      
-      // Apply opacity
-      color.a *= uOpacity;
-      
-      // Add subtle glow based on time
-      float glow = sin(uTime * 0.5) * 0.02 + 0.98;
-      color.rgb *= glow;
-      
-      gl_FragColor = color;
+        // Base gradient
+        vec3 color = mix(uColor, uColor * 1.2, vUv.y);
+        
+        // Animated subtle shimmer
+        float shimmer = sin(vUv.x * 10.0 + uTime * 0.5) * 0.02 + 0.98;
+        color *= shimmer;
+        
+        // Glow effect for active layer
+        vec3 glow = uGlowColor * uActiveGlow * 0.3;
+        color += glow;
+        
+        // Edge glow
+        float edgeFactor = 1.0 - smoothstep(0.4, 0.5, abs(vUv.x - 0.5)) * (1.0 - smoothstep(0.4, 0.5, abs(vUv.y - 0.5)));
+        color += uGlowColor * edgeFactor * uActiveGlow * 0.2;
+        
+        // Apply blur-based noise for depth perception
+        float blur = uBlurAmount * 0.01;
+        float noise = fract(sin(dot(vUv, vec2(12.9898, 78.233))) * 43758.5453) * blur;
+        color += noise * 0.1;
+        
+        gl_FragColor = vec4(color, uOpacity);
     }
-  `
+    `
 );
 
-// Extend Three.js with our custom material
 extend({ DepthBlurMaterial });
 
 // TypeScript declarations
@@ -69,10 +68,12 @@ declare global {
     namespace JSX {
         interface IntrinsicElements {
             depthBlurMaterial: JSX.IntrinsicElements['shaderMaterial'] & {
-                uTexture?: THREE.Texture | null;
                 uBlurAmount?: number;
                 uOpacity?: number;
                 uTime?: number;
+                uColor?: THREE.Color;
+                uGlowColor?: THREE.Color;
+                uActiveGlow?: number;
             };
         }
     }
@@ -82,14 +83,16 @@ interface LayerPlaneProps {
     layer: Layer;
     depthScale?: number;
     children?: React.ReactNode;
+    isActive?: boolean;
 }
 
 /**
- * Individual layer plane with depth-based blur
+ * Individual layer plane with depth-based blur and parallax
  */
-export function LayerPlane({ layer, depthScale = 2, children }: LayerPlaneProps) {
+export function LayerPlane({ layer, depthScale = 2, children, isActive = false }: LayerPlaneProps) {
     const meshRef = useRef<THREE.Mesh>(null);
     const materialRef = useRef<THREE.ShaderMaterial>(null);
+    const borderRef = useRef<THREE.Mesh>(null);
     const { currentZ } = useZStore();
 
     // Calculate depth-based values
@@ -97,55 +100,92 @@ export function LayerPlane({ layer, depthScale = 2, children }: LayerPlaneProps)
     const distanceFromCamera = Math.abs(depth - currentZ);
 
     // Opacity decreases with distance
-    const depthOpacity = Math.max(0.15, 1 - distanceFromCamera * 0.3);
+    const depthOpacity = Math.max(0.2, 1 - distanceFromCamera * 0.25);
     const finalOpacity = layer.opacity * depthOpacity;
 
     // Blur increases with distance (Prism effect)
-    const depthBlur = Math.min(layer.blurIntensity + distanceFromCamera * 5, 50);
+    const depthBlur = Math.min(layer.blurIntensity + distanceFromCamera * 8, 50);
 
     // Animation
     useFrame(({ clock }) => {
         if (materialRef.current) {
             materialRef.current.uniforms.uTime.value = clock.elapsedTime;
             materialRef.current.uniforms.uBlurAmount.value = depthBlur;
-            materialRef.current.uniforms.uOpacity.value = finalOpacity;
+            materialRef.current.uniforms.uOpacity.value = finalOpacity * 0.6;
+            materialRef.current.uniforms.uActiveGlow.value = isActive ? 1 : 0;
         }
 
-        // Subtle parallax movement
+        // Parallax movement
         if (meshRef.current) {
-            const parallaxFactor = 0.02 * layer.zIndex;
-            meshRef.current.position.y = Math.sin(clock.elapsedTime * 0.5) * parallaxFactor;
+            const parallaxFactor = 0.03 * layer.zIndex;
+            meshRef.current.position.y = Math.sin(clock.elapsedTime * 0.3 + layer.zIndex) * parallaxFactor;
+            meshRef.current.position.x = Math.cos(clock.elapsedTime * 0.2 + layer.zIndex) * parallaxFactor * 0.5;
+        }
+
+        // Border glow animation
+        if (borderRef.current) {
+            const mat = borderRef.current.material as THREE.MeshBasicMaterial;
+            mat.opacity = isActive
+                ? 0.4 + Math.sin(clock.elapsedTime * 2) * 0.1
+                : Math.max(0, 0.15 - distanceFromCamera * 0.05);
         }
     });
 
-    // Create glassmorphic background
-    const geometry = useMemo(() => new THREE.PlaneGeometry(16, 9, 1, 1), []);
+    const geometry = useMemo(() => new THREE.PlaneGeometry(16, 9, 32, 32), []);
 
     return (
         <group position={[0, 0, -depth * depthScale]}>
-            {/* Background plane with blur effect */}
+            {/* Background plane with glassmorphism */}
             <mesh ref={meshRef} geometry={geometry}>
-                <meshStandardMaterial
-                    color="#1e1e3f"
+                <depthBlurMaterial
+                    ref={materialRef}
                     transparent
-                    opacity={finalOpacity * 0.4}
                     side={THREE.DoubleSide}
+                    uBlurAmount={depthBlur}
+                    uOpacity={finalOpacity * 0.6}
+                    uTime={0}
+                    uColor={new THREE.Color('#1a1a2e')}
+                    uGlowColor={new THREE.Color('#6366f1')}
+                    uActiveGlow={isActive ? 1 : 0}
                 />
             </mesh>
 
-            {/* Layer border glow */}
-            <mesh position={[0, 0, 0.001]}>
-                <planeGeometry args={[16.1, 9.1]} />
+            {/* Glowing border frame */}
+            <mesh ref={borderRef} position={[0, 0, 0.01]}>
+                <planeGeometry args={[16.2, 9.2]} />
                 <meshBasicMaterial
-                    color="#6366f1"
+                    color={isActive ? '#8b5cf6' : '#6366f1'}
                     transparent
-                    opacity={distanceFromCamera < 0.5 ? 0.3 - distanceFromCamera * 0.5 : 0}
+                    opacity={isActive ? 0.4 : 0.1}
                     side={THREE.DoubleSide}
+                    wireframe
                 />
             </mesh>
 
-            {/* Layer content */}
-            <group position={[0, 0, 0.01]}>
+            {/* Layer label */}
+            <Html
+                position={[-7.5, 4.2, 0.1]}
+                transform
+                occlude
+                style={{
+                    transition: 'all 0.3s',
+                    opacity: isActive ? 1 : 0.5,
+                    transform: `scale(${isActive ? 1.1 : 1})`,
+                }}
+            >
+                <div className={`
+                    px-3 py-1 rounded-full text-xs font-medium
+                    ${isActive
+                        ? 'bg-aurora-primary/80 text-white shadow-lg shadow-purple-500/30'
+                        : 'bg-white/10 text-white/60'
+                    }
+                `}>
+                    {layer.name}
+                </div>
+            </Html>
+
+            {/* Layer content (widgets) */}
+            <group position={[0, 0, 0.02]}>
                 {children}
             </group>
         </group>
@@ -155,13 +195,14 @@ export function LayerPlane({ layer, depthScale = 2, children }: LayerPlaneProps)
 interface LayerStackProps {
     layers: Layer[];
     depthScale?: number;
-    renderWidget?: (widget: unknown, layerId: string) => React.ReactNode;
 }
 
 /**
- * Renders all layers in the Z-axis stack
+ * Renders all layers in the Z-axis stack with depth effects
  */
 export function LayerStack({ layers, depthScale = 2 }: LayerStackProps) {
+    const { currentZ } = useZStore();
+
     const sortedLayers = useMemo(
         () => [...layers].sort((a, b) => a.zIndex - b.zIndex),
         [layers]
@@ -169,37 +210,17 @@ export function LayerStack({ layers, depthScale = 2 }: LayerStackProps) {
 
     return (
         <group>
-            {sortedLayers.map((layer) => (
-                <LayerPlane key={layer.id} layer={layer} depthScale={depthScale}>
-                    {/* Layer label */}
-                    <LayerLabel layer={layer} />
-                </LayerPlane>
-            ))}
-        </group>
-    );
-}
-
-interface LayerLabelProps {
-    layer: Layer;
-}
-
-/**
- * 3D label for layer identification
- */
-function LayerLabel({ layer }: LayerLabelProps) {
-    const { currentZ } = useZStore();
-    const isActive = Math.abs(layer.zIndex - currentZ) < 0.5;
-
-    return (
-        <group position={[-7, 4, 0]}>
-            <mesh>
-                <planeGeometry args={[2.5, 0.5]} />
-                <meshBasicMaterial
-                    color={isActive ? '#6366f1' : '#2d2d5a'}
-                    transparent
-                    opacity={isActive ? 0.9 : 0.5}
-                />
-            </mesh>
+            {sortedLayers.map((layer) => {
+                const isActive = Math.abs(layer.zIndex - currentZ) < 0.5;
+                return (
+                    <LayerPlane
+                        key={layer.id}
+                        layer={layer}
+                        depthScale={depthScale}
+                        isActive={isActive}
+                    />
+                );
+            })}
         </group>
     );
 }

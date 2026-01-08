@@ -1,237 +1,219 @@
-import { useMemo } from 'react';
-import { Html } from '@react-three/drei';
+import { useRef, useState } from 'react';
+import { Html, Billboard } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import { Widget } from '../api/client';
 
-interface WidgetRendererProps {
+interface WidgetContainerProps {
     widget: Widget;
-    data?: {
-        value: number;
-        trend: number;
-        constituents?: Array<{ name: string; value: number; weight: number }>;
-        historical?: Array<{ timestamp: string; value: number }>;
-    };
     position?: [number, number, number];
     scale?: number;
+    onDragStart?: () => void;
+    onDragEnd?: () => void;
 }
+
+// Mock data generators
+const getMockMetricData = (widgetId: string) => {
+    const seed = widgetId.charCodeAt(0) + widgetId.charCodeAt(widgetId.length - 1);
+    return {
+        value: Math.floor(10000 + (seed * 1234) % 90000),
+        trend: ((seed % 20) - 10) / 2,
+        label: ['Revenue', 'Users', 'Orders', 'Conversion'][seed % 4],
+    };
+};
+
+const getMockChartData = (widgetId: string) => {
+    const seed = widgetId.charCodeAt(0);
+    return Array.from({ length: 12 }, (_, i) => ({
+        value: 30 + Math.sin((i + seed) * 0.5) * 20 + Math.random() * 10,
+        label: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i],
+    }));
+};
+
+const getMockCompositeData = (widgetId: string) => {
+    const seed = widgetId.charCodeAt(0);
+    const categories = ['Sales', 'Marketing', 'Engineering', 'Support'];
+    return categories.map((name, i) => ({
+        name,
+        value: Math.floor(20 + ((seed + i) * 17) % 80),
+        color: ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc'][i],
+    }));
+};
 
 /**
- * Main widget renderer that delegates to specific widget types
+ * Metric Widget - displays a single KPI with trend
  */
-export function WidgetRenderer({ widget, data, position = [0, 0, 0], scale = 1 }: WidgetRendererProps) {
-    const mockData = useMemo(() => data || {
-        value: Math.random() * 1000,
-        trend: (Math.random() - 0.5) * 20,
-        constituents: [
-            { name: 'A', value: 400, weight: 0.4 },
-            { name: 'B', value: 350, weight: 0.35 },
-            { name: 'C', value: 250, weight: 0.25 },
-        ],
-        historical: Array.from({ length: 7 }, (_, i) => ({
-            timestamp: new Date(Date.now() - i * 86400000).toISOString(),
-            value: Math.random() * 1000,
-        })),
-    }, [data]);
-
-    return (
-        <group position={position} scale={scale}>
-            <Html
-                transform
-                distanceFactor={10}
-                style={{
-                    width: widget.type === 'composite' ? '300px' : '200px',
-                    pointerEvents: 'auto',
-                }}
-            >
-                {widget.type === 'metric' && (
-                    <MetricWidget widget={widget} data={mockData} />
-                )}
-                {widget.type === 'chart' && (
-                    <ChartWidget widget={widget} data={mockData} />
-                )}
-                {widget.type === 'composite' && (
-                    <CompositeWidget widget={widget} data={mockData} />
-                )}
-            </Html>
-        </group>
-    );
-}
-
-interface MetricWidgetProps {
-    widget: Widget;
-    data: { value: number; trend: number };
-}
-
-/**
- * Metric widget displaying a single key value with trend
- */
-function MetricWidget({ widget, data }: MetricWidgetProps) {
-    const config = widget.config as { prefix?: string; suffix?: string; format?: string };
+function MetricWidget({ widget }: { widget: Widget }) {
+    const data = getMockMetricData(widget.id);
     const isPositive = data.trend >= 0;
 
-    const formattedValue = useMemo(() => {
-        const val = data.value;
-        if (config.format === 'number') {
-            return val.toLocaleString('en-US', { maximumFractionDigits: 0 });
-        }
-        return val.toFixed(1);
-    }, [data.value, config.format]);
-
     return (
-        <div className="glass-panel p-4 min-w-[180px] cursor-pointer hover:scale-105 transition-transform">
-            <div className="text-white/60 text-xs font-medium uppercase tracking-wider mb-2">
-                {widget.title}
+        <div className="glass-panel p-4 w-48 select-none cursor-grab active:cursor-grabbing">
+            <div className="text-xs text-white/60 uppercase tracking-wide mb-1">
+                {widget.title || data.label}
             </div>
-            <div className="text-2xl font-bold text-white">
-                {config.prefix || ''}{formattedValue}{config.suffix || ''}
+            <div className="text-2xl font-bold text-white mb-1">
+                {data.value.toLocaleString()}
             </div>
-            <div className={`flex items-center gap-1 mt-2 text-sm ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={`text-sm flex items-center gap-1 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
                 <span>{isPositive ? '↑' : '↓'}</span>
                 <span>{Math.abs(data.trend).toFixed(1)}%</span>
-                <span className="text-white/40 ml-1">vs last period</span>
+                <span className="text-white/40 text-xs">vs last period</span>
             </div>
         </div>
     );
 }
 
-interface ChartWidgetProps {
-    widget: Widget;
-    data: { historical?: Array<{ timestamp: string; value: number }> };
-}
-
 /**
- * Chart widget displaying trend visualization
+ * Chart Widget - displays a sparkline/area chart
  */
-function ChartWidget({ widget, data }: ChartWidgetProps) {
-    const config = widget.config as { chartType?: string };
-    const points = data.historical || [];
+function ChartWidget({ widget }: { widget: Widget }) {
+    const data = getMockChartData(widget.id);
+    const maxValue = Math.max(...data.map(d => d.value));
+    const minValue = Math.min(...data.map(d => d.value));
+    const range = maxValue - minValue || 1;
 
-    // Generate SVG path for sparkline
-    const sparklinePath = useMemo(() => {
-        if (points.length < 2) return '';
+    // Create SVG path
+    const pathPoints = data.map((d, i) => {
+        const x = (i / (data.length - 1)) * 180;
+        const y = 50 - ((d.value - minValue) / range) * 40;
+        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+    }).join(' ');
 
-        const values = points.map(p => p.value);
-        const min = Math.min(...values);
-        const max = Math.max(...values);
-        const range = max - min || 1;
-
-        const width = 180;
-        const height = 50;
-
-        return points
-            .map((point, i) => {
-                const x = (i / (points.length - 1)) * width;
-                const y = height - ((point.value - min) / range) * height;
-                return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-            })
-            .join(' ');
-    }, [points]);
+    const areaPath = `${pathPoints} L 180 50 L 0 50 Z`;
 
     return (
-        <div className="glass-panel p-4 min-w-[200px] cursor-pointer hover:scale-105 transition-transform">
-            <div className="text-white/60 text-xs font-medium uppercase tracking-wider mb-3">
-                {widget.title}
+        <div className="glass-panel p-4 w-56 select-none cursor-grab active:cursor-grabbing">
+            <div className="text-xs text-white/60 uppercase tracking-wide mb-2">
+                {widget.title || 'Trend'}
             </div>
-
-            {/* Sparkline chart */}
-            <svg width="180" height="50" className="overflow-visible">
+            <svg viewBox="0 0 180 60" className="w-full h-16">
                 <defs>
-                    <linearGradient id={`gradient-${widget.id}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                    <linearGradient id={`gradient-${widget.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#6366f1" stopOpacity="0.5" />
+                        <stop offset="100%" stopColor="#6366f1" stopOpacity="0.1" />
                     </linearGradient>
                 </defs>
-
-                {/* Area fill */}
-                <path
-                    d={`${sparklinePath} L 180 50 L 0 50 Z`}
-                    fill={`url(#gradient-${widget.id})`}
-                />
-
-                {/* Line */}
-                <path
-                    d={sparklinePath}
-                    fill="none"
-                    stroke="#6366f1"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
-
-                {/* Current value dot */}
-                {points.length > 0 && (
+                <path d={areaPath} fill={`url(#gradient-${widget.id})`} />
+                <path d={pathPoints} fill="none" stroke="#8b5cf6" strokeWidth="2" />
+                {data.map((d, i) => (
                     <circle
-                        cx="180"
-                        cy={50 - ((points[0]?.value - Math.min(...points.map(p => p.value))) / (Math.max(...points.map(p => p.value)) - Math.min(...points.map(p => p.value)) || 1)) * 50}
-                        r="4"
-                        fill="#6366f1"
-                        stroke="white"
-                        strokeWidth="2"
+                        key={i}
+                        cx={(i / (data.length - 1)) * 180}
+                        cy={50 - ((d.value - minValue) / range) * 40}
+                        r="2"
+                        fill="#a855f7"
                     />
-                )}
+                ))}
             </svg>
-
-            <div className="text-xs text-white/40 mt-2">
-                {config.chartType || 'line'} • Last 7 days
+            <div className="flex justify-between text-xs text-white/40 mt-1">
+                <span>{data[0].label}</span>
+                <span>{data[data.length - 1].label}</span>
             </div>
         </div>
     );
 }
 
-interface CompositeWidgetProps {
-    widget: Widget;
-    data: { value: number; constituents?: Array<{ name: string; value: number; weight: number }> };
-}
-
 /**
- * Composite widget showing breakdown of components
+ * Composite Widget - displays breakdown bars
  */
-function CompositeWidget({ widget, data }: CompositeWidgetProps) {
-    const constituents = data.constituents || [];
-    const total = constituents.reduce((sum, c) => sum + c.value, 0);
+function CompositeWidget({ widget }: { widget: Widget }) {
+    const data = getMockCompositeData(widget.id);
+    const total = data.reduce((sum, d) => sum + d.value, 0);
 
     return (
-        <div className="glass-panel p-4 min-w-[280px] cursor-pointer hover:scale-105 transition-transform">
-            <div className="text-white/60 text-xs font-medium uppercase tracking-wider mb-3">
-                {widget.title}
+        <div className="glass-panel p-4 w-52 select-none cursor-grab active:cursor-grabbing">
+            <div className="text-xs text-white/60 uppercase tracking-wide mb-3">
+                {widget.title || 'Breakdown'}
             </div>
-
-            {/* Total value */}
-            <div className="text-xl font-bold text-white mb-4">
-                ${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-            </div>
-
-            {/* Stacked bar */}
-            <div className="flex h-3 rounded-full overflow-hidden mb-3">
-                {constituents.map((c, i) => (
-                    <div
-                        key={c.name}
-                        className="h-full transition-all duration-300"
-                        style={{
-                            width: `${c.weight * 100}%`,
-                            backgroundColor: ['#6366f1', '#8b5cf6', '#06b6d4'][i % 3],
-                        }}
-                    />
-                ))}
-            </div>
-
-            {/* Legend */}
-            <div className="space-y-1">
-                {constituents.map((c, i) => (
-                    <div key={c.name} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                            <div
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: ['#6366f1', '#8b5cf6', '#06b6d4'][i % 3] }}
-                            />
-                            <span className="text-white/80">{c.name}</span>
+            <div className="space-y-2">
+                {data.map((item, i) => (
+                    <div key={i}>
+                        <div className="flex justify-between text-xs mb-1">
+                            <span className="text-white/80">{item.name}</span>
+                            <span className="text-white/60">{item.value}%</span>
                         </div>
-                        <span className="text-white/60">
-                            ${c.value.toLocaleString()} ({(c.weight * 100).toFixed(0)}%)
-                        </span>
+                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                    width: `${(item.value / 100) * 100}%`,
+                                    background: `linear-gradient(90deg, ${item.color}, ${item.color}88)`,
+                                }}
+                            />
+                        </div>
                     </div>
                 ))}
             </div>
+            <div className="mt-3 pt-2 border-t border-white/10 text-sm text-white/60">
+                Total Score: <span className="text-white font-medium">{total}</span>
+            </div>
         </div>
+    );
+}
+
+/**
+ * Main Widget Renderer - 3D positioned widget
+ */
+export function WidgetRenderer({
+    widget,
+    position = [0, 0, 0],
+    scale = 1,
+}: WidgetContainerProps) {
+    const groupRef = useRef<THREE.Group>(null);
+    const [hovered, setHovered] = useState(false);
+
+    // Floating animation
+    useFrame(({ clock }) => {
+        if (groupRef.current) {
+            const t = clock.elapsedTime;
+            // Subtle float effect
+            groupRef.current.position.y = position[1] + Math.sin(t * 0.5 + position[0]) * 0.05;
+            // Gentle rotation on hover
+            groupRef.current.rotation.y = THREE.MathUtils.lerp(
+                groupRef.current.rotation.y,
+                hovered ? 0.1 : 0,
+                0.1
+            );
+        }
+    });
+
+    const renderWidget = () => {
+        switch (widget.type) {
+            case 'metric':
+                return <MetricWidget widget={widget} />;
+            case 'chart':
+                return <ChartWidget widget={widget} />;
+            case 'composite':
+                return <CompositeWidget widget={widget} />;
+            default:
+                return <MetricWidget widget={widget} />;
+        }
+    };
+
+    return (
+        <group
+            ref={groupRef}
+            position={position}
+            scale={scale}
+        >
+            <Billboard follow={false}>
+                <Html
+                    transform
+                    occlude
+                    distanceFactor={5}
+                    style={{
+                        transition: 'transform 0.3s, opacity 0.3s',
+                        transform: `scale(${hovered ? 1.05 : 1})`,
+                        opacity: hovered ? 1 : 0.95,
+                    }}
+                    onPointerEnter={() => setHovered(true)}
+                    onPointerLeave={() => setHovered(false)}
+                >
+                    {renderWidget()}
+                </Html>
+            </Billboard>
+        </group>
     );
 }
 
